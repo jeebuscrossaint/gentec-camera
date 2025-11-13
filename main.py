@@ -1,4 +1,3 @@
-
 """
 Gentec Beamage 4M IR Camera - Windows Python Wrapper
 Serial: 228451
@@ -41,9 +40,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# UPDATE THIS PATH TO YOUR BeamageSDK.dll LOCATION
+# Path to BeamageSDK.dll (relative to script location)
 # ============================================================================
-DLL_PATH = r"C:\Path\To\BeamageSDK.dll"  # <-- CHANGE THIS
+import os
+SCRIPT_DIR = Path(__file__).parent if '__file__' in globals() else Path.cwd()
+DLL_PATH = SCRIPT_DIR / "Example_Beamage_SDK_CSharp_V1.02.02" / "3. DLL File" / "BeamageSDK.dll"
+
+# Or set absolute path:
+# DLL_PATH = r"C:\full\path\to\BeamageSDK.dll"
 # ============================================================================
 
 
