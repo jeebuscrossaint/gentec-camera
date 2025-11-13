@@ -195,19 +195,31 @@ class BeamageCamera:
         Capture single image
         
         Returns:
-            np.ndarray: Image as 2D array (2048x2048)
+            np.ndarray: Image as 2D array (size depends on ROI settings)
         """
         if not self.is_connected:
             raise RuntimeError("Not connected!")
         
         # Get raw image buffer
         img_data = self.sdk.cameras[self.camera_index].Image.GetImage()
+        
+        # Convert to numpy array
+        img_array = np.array(list(img_data), dtype=np.int32)
+        
+        # Get actual dimensions from SDK
         width = self.sdk.cameras[self.camera_index].Image.width
         height = self.sdk.cameras[self.camera_index].Image.height
         
-        # Convert to numpy (SDK returns 1D array, reshape to 2D)
-        img_array = np.array(list(img_data), dtype=np.int32)
-        img_2d = img_array.reshape((height, width))
+        # The SDK always returns full sensor data (2048x2048)
+        # but reports ROI dimensions, so we need to reshape to actual data size
+        total_pixels = len(img_array)
+        actual_width = 2048  # Beamage 4M sensor width
+        actual_height = total_pixels // actual_width
+        
+        img_2d = img_array.reshape((actual_height, actual_width))
+        
+        logger.debug(f"Captured: {actual_width}x{actual_height} "
+                    f"(SDK reports {width}x{height})")
         
         return img_2d
     
@@ -221,7 +233,7 @@ class BeamageCamera:
                 'diameter_y': 4-sigma diameter Y (um),
                 'centroid_x': Centroid X position,
                 'centroid_y': Centroid Y position,
-                'fps': Frame rate
+                'fps': Frame rate (if available)
             }
         """
         if not self.is_connected:
@@ -229,12 +241,18 @@ class BeamageCamera:
         
         cam = self.sdk.cameras[self.camera_index]
         
+        # Try to get FPS, fallback if not available
+        try:
+            fps = float(cam.fps) if hasattr(cam, 'fps') else 0.0
+        except:
+            fps = 0.0
+        
         return {
             'diameter_x': float(cam.Image.DiameterInfo.diameter4SigmaX),
             'diameter_y': float(cam.Image.DiameterInfo.diameter4SigmaY),
             'centroid_x': float(cam.Image.CentroidInfo.centroidXPos),
             'centroid_y': float(cam.Image.CentroidInfo.centroidYPos),
-            'fps': float(cam.cameraFps)
+            'fps': fps
         }
     
     def disconnect(self):
