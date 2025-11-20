@@ -1,0 +1,12 @@
+Software Version: 1.08.04
+Camera Name: Beamage-4M
+Serial Number: 228451
+Firmware: 1.70
+Description: USB3.0 Beam Profiling Camera
+ADC level: 12 bits 
+Total Duration: 0:0:1:0 (DD:HH:MM:SS)
+Sampling Rate: 0:0:1:0 (DD:HH:MM:SS)
+Video Trigger: Not activated
+_______________________________________________________________
+Date	 Elapsed time(sec)	 dSigma X(um)	 dSigma Y (um)	 Effective Diameter(um)	 Ellipticity(%)	 Orientation(degrees)	 Centroid X(um)	 Centroid y(um)	 Peak X(um)	 Peak Y(um)	 Peak Saturation level(%)	 Peak to Average Ratio X	 Peak to Average Ratio Y	 
+ 
