@@ -1,115 +1,60 @@
 """
-Gentec Beamage 4M IR Camera - Windows Python Wrapper
-Serial: 228451
+Gentec Beamage 4M IR Camera - Python Interface
+CLI tool for capturing beam profile images
 
-SETUP INSTRUCTIONS:
-===================
+Requirements:
+    pip install pythonnet numpy matplotlib astropy
 
-1. Download & Install PC-BEAMAGE Software + Drivers:
-   https://www.gentec-eo.com/fr/diagnostic-de-faisceau-laser/profileurs-faisceaux
-   (Go to Resources tab -> Downloads -> Latest PC-BEAMAGE + Drivers)
-
-2. Test camera works with PC-BEAMAGE GUI first
-   - Plug in camera via USB3
-   - Launch PC-BEAMAGE
-   - Verify you can see live image
-
-3. Download BEAMAGE SDK:
-   https://www.gentec-eo.com/dwl/software/Example_Beamage_SDK_CSharp_V1.02.02.zip
-   
-4. Extract and locate BeamageSDK.dll (usually in the bin folder)
-
-5. Install Python dependencies:
-   pip install pythonnet numpy matplotlib
-
-6. Update DLL_PATH below to point to your BeamageSDK.dll
-
-7. Run this script!
-
-USAGE:
-======
-python main.py --exposure=92.19 --gain=1
-python main.py --auto-exposure
-python main.py --exposure=100 --gain=2 --frames=10
-
+Usage:
+    python main.py --help
+    python main.py --auto-exposure --frames 10
+    python main.py --exposure 50.5 --output my_capture.fits
 """
 
 import clr
 import sys
+import argparse
 import numpy as np
 from pathlib import Path
 from typing import Optional, Dict
 import logging
 import time
-import argparse
 
-logging.basicConfig(level=logging.INFO)
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s: %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# Path to BeamageSDK.dll (relative to script location)
-# ============================================================================
-import os
+# Find DLL relative to script
 SCRIPT_DIR = Path(__file__).parent if '__file__' in globals() else Path.cwd()
-DLL_PATH = SCRIPT_DIR / "Example_Beamage_SDK_CSharp_V1.02.02" / "3. DLL File" / "BeamageSDK.dll"
-
-# Or set absolute path:
-# DLL_PATH = r"C:\full\path\to\BeamageSDK.dll"
-# ============================================================================
+DEFAULT_DLL_PATH = SCRIPT_DIR / "Example_Beamage_SDK_CSharp_V1.02.02" / "3. DLL File" / "BeamageSDK.dll"
 
 
 class BeamageCamera:
-    """
-    Python wrapper for Gentec Beamage 4M IR camera
-    Simple interface for exposure control and image capture
-    """
+    """Python wrapper for Gentec Beamage 4M IR camera"""
     
-    def __init__(self, dll_path: str = DLL_PATH, serial_number: str = "228451"):
-        """
-        Initialize camera
-        
-        Args:
-            dll_path: Path to BeamageSDK.dll
-            serial_number: Camera serial number (default: 228451)
-        """
+    def __init__(self, dll_path: Path, serial_number: Optional[str] = None):
         self.serial_number = serial_number
         self.camera_index = None
         self.is_connected = False
         
-        # Load the DLL
-        dll_path = Path(dll_path)
+        # Load DLL
         if not dll_path.exists():
-            raise FileNotFoundError(
-                f"BeamageSDK.dll not found at {dll_path}\n"
-                f"Please update DLL_PATH in the script!"
-            )
+            raise FileNotFoundError(f"BeamageSDK.dll not found at {dll_path}")
         
         sys.path.append(str(dll_path.parent))
         clr.AddReference(str(dll_path.stem))
         
-        # Import SDK
         from BeamageApi import BSDK
         self.sdk = BSDK()
-        
-        # Camera specs
-        self.width = 2048
-        self.height = 2048
-        self.pixel_size = 5.5  # um
         
         logger.info(f"SDK initialized (version: {self.sdk.GetVersion()})")
     
     def connect(self, camera_index: int = 0) -> bool:
-        """
-        Detect and connect to camera
-        
-        Args:
-            camera_index: Which camera to connect to (0 = first)
-        
-        Returns:
-            bool: True if successful
-        """
+        """Detect and connect to camera"""
         try:
-            # Detect cameras
             self.sdk.Detect()
             
             if self.sdk.cameras.Count == 0:
@@ -118,14 +63,25 @@ class BeamageCamera:
             
             logger.info(f"Found {self.sdk.cameras.Count} camera(s)")
             
-            # List all cameras
+            # List cameras
             for i in range(self.sdk.cameras.Count):
                 serial = self.sdk.cameras[i].Properties.GetSerialNumber()
                 is_4m = self.sdk.cameras[i].Properties.Is4mSensor()
                 model = "Beamage-4M" if is_4m else "Beamage-3.0"
                 logger.info(f"  [{i}] {model} S/N:{serial}")
             
-            # Connect to specified camera
+            # Find camera by serial if specified
+            if self.serial_number:
+                found = False
+                for i in range(self.sdk.cameras.Count):
+                    if self.sdk.cameras[i].Properties.GetSerialNumber() == self.serial_number:
+                        camera_index = i
+                        found = True
+                        break
+                if not found:
+                    logger.error(f"Camera with S/N {self.serial_number} not found")
+                    return False
+            
             if camera_index >= self.sdk.cameras.Count:
                 logger.error(f"Camera index {camera_index} out of range")
                 return False
@@ -135,7 +91,7 @@ class BeamageCamera:
             self.is_connected = True
             
             serial = self.sdk.cameras[self.camera_index].Properties.GetSerialNumber()
-            logger.info(f"✓ Connected to camera {camera_index} (S/N:{serial})")
+            logger.info(f"Connected to camera {camera_index} (S/N:{serial})")
             
             return True
             
@@ -144,49 +100,34 @@ class BeamageCamera:
             return False
     
     def start(self):
-        """Start continuous image capture"""
+        """Start continuous capture"""
         if not self.is_connected:
-            raise RuntimeError("Not connected! Call connect() first")
-        
+            raise RuntimeError("Not connected!")
         self.sdk.cameras[self.camera_index].Run()
         logger.info("Started capture")
     
     def stop(self):
-        """Stop image capture"""
+        """Stop capture"""
         if not self.is_connected:
             raise RuntimeError("Not connected!")
-        
         self.sdk.cameras[self.camera_index].StopRun()
         logger.info("Stopped capture")
     
     def set_exposure(self, time_ms: float):
-        """
-        Set exposure time (manual mode)
-        
-        Args:
-            time_ms: Exposure time in milliseconds (0.06 to 5000)
-        """
+        """Set manual exposure time (0.06-5000 ms)"""
         if not self.is_connected:
             raise RuntimeError("Not connected!")
-        
         if not (0.06 <= time_ms <= 5000):
             raise ValueError("Exposure must be 0.06-5000 ms")
         
-        # Disable auto exposure first
         self.sdk.cameras[self.camera_index].SetToAutoExposure(False)
         self.sdk.cameras[self.camera_index].SetExposureTime(float(time_ms))
-        logger.info(f"Set exposure: {time_ms} ms")
+        logger.info(f"Set exposure: {time_ms} ms (manual)")
     
     def set_auto_exposure(self, enable: bool = True):
-        """
-        Enable/disable auto exposure
-        
-        Args:
-            enable: True for auto, False for manual
-        """
+        """Enable/disable auto exposure"""
         if not self.is_connected:
             raise RuntimeError("Not connected!")
-        
         self.sdk.cameras[self.camera_index].SetToAutoExposure(enable)
         logger.info(f"Auto exposure: {'ON' if enable else 'OFF'}")
     
@@ -194,89 +135,30 @@ class BeamageCamera:
         """Get current exposure time in ms"""
         if not self.is_connected:
             raise RuntimeError("Not connected!")
-        
         return float(self.sdk.cameras[self.camera_index].Settings.exposureTime)
     
-    def set_gain(self, gain: int):
-        """
-        Set camera gain
-        
-        Args:
-            gain: Gain value (typically 1-4, check SDK docs for your model)
-        """
-        if not self.is_connected:
-            raise RuntimeError("Not connected!")
-        
-        try:
-            self.sdk.cameras[self.camera_index].SetGain(int(gain))
-            logger.info(f"Set gain: {gain}")
-        except Exception as e:
-            logger.error(f"Failed to set gain: {e}")
-            raise
-    
-    def get_gain(self) -> int:
-        """Get current gain value"""
-        if not self.is_connected:
-            raise RuntimeError("Not connected!")
-        
-        try:
-            return int(self.sdk.cameras[self.camera_index].Settings.gain)
-        except:
-            logger.warning("Could not read gain value")
-            return -1
-    
     def capture(self) -> np.ndarray:
-        """
-        Capture single image
-        
-        Returns:
-            np.ndarray: Image as 2D array (size depends on ROI settings)
-        """
+        """Capture single image, returns 2D numpy array"""
         if not self.is_connected:
             raise RuntimeError("Not connected!")
         
-        # Get raw image buffer
         img_data = self.sdk.cameras[self.camera_index].Image.GetImage()
-        
-        # Convert to numpy array
         img_array = np.array(list(img_data), dtype=np.int32)
         
-        # Get actual dimensions from SDK
-        width = self.sdk.cameras[self.camera_index].Image.width
-        height = self.sdk.cameras[self.camera_index].Image.height
-        
-        # The SDK always returns full sensor data (2048x2048)
-        # but reports ROI dimensions, so we need to reshape to actual data size
+        # Reshape to actual dimensions
         total_pixels = len(img_array)
-        actual_width = 2048  # Beamage 4M sensor width
-        actual_height = total_pixels // actual_width
+        width = 2048
+        height = total_pixels // width
         
-        img_2d = img_array.reshape((actual_height, actual_width))
-        
-        logger.debug(f"Captured: {actual_width}x{actual_height} "
-                    f"(SDK reports {width}x{height})")
-        
-        return img_2d
+        return img_array.reshape((height, width))
     
     def get_beam_stats(self) -> Dict:
-        """
-        Get beam analysis parameters
-        
-        Returns:
-            dict: {
-                'diameter_x': 4-sigma diameter X (um),
-                'diameter_y': 4-sigma diameter Y (um),
-                'centroid_x': Centroid X position,
-                'centroid_y': Centroid Y position,
-                'fps': Frame rate (if available)
-            }
-        """
+        """Get beam analysis parameters"""
         if not self.is_connected:
             raise RuntimeError("Not connected!")
         
         cam = self.sdk.cameras[self.camera_index]
         
-        # Try to get FPS, fallback if not available
         try:
             fps = float(cam.fps) if hasattr(cam, 'fps') else 0.0
         except:
@@ -308,176 +190,364 @@ class BeamageCamera:
         self.disconnect()
 
 
-def parse_arguments():
+def save_fits(filepath: Path, data: np.ndarray, stats: Dict, 
+              exposure_ms: float, serial: str, n_frames: int):
+    """
+    Save image data to FITS file with proper headers
+    
+    Args:
+        filepath: Output path
+        data: Image data (2D or 3D array)
+        stats: Beam statistics dict
+        exposure_ms: Exposure time in milliseconds
+        serial: Camera serial number
+        n_frames: Number of frames
+    """
+    try:
+        from astropy.io import fits
+        from datetime import datetime, timezone
+    except ImportError:
+        logger.error("astropy not installed! Run: pip install astropy")
+        raise
+    
+    # Create primary HDU with image data
+    hdu = fits.PrimaryHDU(data)
+    header = hdu.header
+    
+    # Standard FITS keywords
+    header['SIMPLE'] = True
+    header['BITPIX'] = 32  # 32-bit integer
+    header['NAXIS'] = len(data.shape)
+    
+    # Observation info
+    header['DATE-OBS'] = datetime.now(timezone.utc).isoformat()
+    header['TELESCOP'] = 'CREOL Astrophotonics Lab'
+    header['INSTRUME'] = 'Gentec Beamage 4M IR'
+    header['SERIAL'] = serial
+    
+    # Detector info
+    header['DETECTOR'] = 'Beamage-4M'
+    header['NAXIS1'] = data.shape[-1]  # Width
+    header['NAXIS2'] = data.shape[-2] if len(data.shape) >= 2 else 1  # Height
+    if len(data.shape) == 3:
+        header['NAXIS3'] = data.shape[0]  # Number of frames
+    header['PIXSIZE'] = (5.5, 'Pixel size in micrometers')
+    header['PIXSZ_X'] = (5.5, '[um] Pixel size X')
+    header['PIXSZ_Y'] = (5.5, '[um] Pixel size Y')
+    
+    # Exposure info
+    header['EXPTIME'] = (exposure_ms / 1000.0, '[s] Exposure time')
+    header['EXPOSURE'] = (exposure_ms, '[ms] Exposure time')
+    
+    # Beam parameters
+    header['BEAM_DX'] = (stats['diameter_x'], '[um] Beam diameter 4-sigma X')
+    header['BEAM_DY'] = (stats['diameter_y'], '[um] Beam diameter 4-sigma Y')
+    header['CENTX'] = (stats['centroid_x'], '[pix] Centroid X position')
+    header['CENTY'] = (stats['centroid_y'], '[pix] Centroid Y position')
+    
+    # Data statistics
+    header['DATAMIN'] = int(data.min())
+    header['DATAMAX'] = int(data.max())
+    header['DATAMEAN'] = float(data.mean())
+    header['DATASTD'] = float(data.std())
+    
+    # Frame info
+    header['NFRAMES'] = (n_frames, 'Number of frames')
+    
+    # Wavelength (Beamage 4M IR range)
+    header['WAVELEN'] = (1550, '[nm] Nominal wavelength')
+    header['WAVEMIN'] = (1495, '[nm] Minimum wavelength')
+    header['WAVEMAX'] = (1595, '[nm] Maximum wavelength')
+    
+    # Software info
+    header['SOFTWARE'] = 'beamage-capture'
+    header['SDKVER'] = '1.2.0.2'
+    
+    # Comments
+    header['COMMENT'] = 'Captured with Gentec Beamage 4M IR camera'
+    header['COMMENT'] = 'CREOL - UCF Astrophotonics Lab'
+    header['COMMENT'] = 'Dr. Eikenberry Research Group'
+    
+    # History
+    header['HISTORY'] = f'Captured {n_frames} frame(s)'
+    header['HISTORY'] = f'Exposure: {exposure_ms} ms'
+    
+    # Write to file
+    hdu.writeto(filepath, overwrite=True)
+    print(f"Saved FITS to {filepath}")
+    print(f"  Headers include: beam stats, exposure, detector info")
+
+
+def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description='Gentec Beamage 4M IR Camera Control',
+        description='Gentec Beamage 4M IR Camera - Capture Interface',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --exposure=92.19 --gain=1
-  python main.py --auto-exposure --frames=10
-  python main.py --exposure=100 --gain=2 --frames=5 --output=my_capture.npy
+    %(prog)s --auto-exposure --frames 10
+    %(prog)s --exposure 50.5 --output my_capture.npy
+    %(prog)s --exposure 100 --frames 1 --no-plot
+    %(prog)s --serial 228451 --auto-exposure
         """
     )
     
-    # Exposure settings
-    exposure_group = parser.add_mutually_exclusive_group()
-    exposure_group.add_argument(
-        '--exposure',
-        type=float,
+    # Exposure settings (mutually exclusive)
+    exp_group = parser.add_mutually_exclusive_group()
+    exp_group.add_argument(
+        '--exposure', 
+        type=float, 
         metavar='MS',
         help='Set manual exposure time in milliseconds (0.06-5000)'
     )
-    exposure_group.add_argument(
-        '--auto-exposure',
+    exp_group.add_argument(
+        '--auto-exposure', 
         action='store_true',
         help='Enable auto exposure mode'
     )
     
-    # Gain setting
+    # Other camera settings
     parser.add_argument(
-        '--gain',
-        type=int,
+        '--gain', 
+        type=float, 
         metavar='N',
-        help='Set camera gain (typically 1-4, check SDK docs)'
+        help='Set camera gain (if supported by SDK)'
     )
     
     # Capture settings
     parser.add_argument(
-        '--frames',
-        type=int,
-        default=5,
+        '--frames', 
+        type=int, 
+        default=5, 
         metavar='N',
         help='Number of frames to capture (default: 5)'
     )
-    
     parser.add_argument(
-        '--output',
-        type=str,
-        default='beamage_capture.npy',
-        metavar='FILE',
-        help='Output filename for saved image (default: beamage_capture.npy)'
+        '--delay', 
+        type=float, 
+        default=0.5, 
+        metavar='SEC',
+        help='Delay between frames in seconds (default: 0.5)'
     )
     
+    # Output settings
     parser.add_argument(
-        '--no-plot',
+        '--output', 
+        type=str, 
+        default='beamage_capture.fits', 
+        metavar='FILE',
+        help='Output filename (.fits, .npy, or .png) (default: beamage_capture.fits)'
+    )
+    parser.add_argument(
+        '--no-plot', 
         action='store_true',
         help='Skip matplotlib visualization'
     )
-    
     parser.add_argument(
-        '--serial',
-        type=str,
-        default='228451',
+        '--save-all', 
+        action='store_true',
+        help='Save all frames, not just the last one'
+    )
+    
+    # Camera selection
+    parser.add_argument(
+        '--serial', 
+        type=str, 
         metavar='SN',
-        help='Camera serial number (default: 228451)'
+        help='Camera serial number (default: first detected)'
+    )
+    parser.add_argument(
+        '--dll', 
+        type=str, 
+        metavar='PATH',
+        help=f'Path to BeamageSDK.dll (default: {DEFAULT_DLL_PATH})'
+    )
+    
+    # Verbosity
+    parser.add_argument(
+        '--quiet', '-q',
+        action='store_true',
+        help='Suppress info messages'
+    )
+    parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable debug messages'
     )
     
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-    args = parse_arguments()
+def main():
+    args = parse_args()
     
-    print("\n" + "="*70)
-    print("Gentec Beamage 4M IR Camera - Python Interface")
-    print("="*70 + "\n")
+    # Configure logging level
+    if args.quiet:
+        logging.getLogger().setLevel(logging.WARNING)
+    elif args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Resolve DLL path
+    dll_path = Path(args.dll) if args.dll else DEFAULT_DLL_PATH
+    
+    print("\n" + "="*60)
+    print("Gentec Beamage 4M IR Camera")
+    print("="*60 + "\n")
     
     # Create camera instance
-    cam = BeamageCamera(serial_number=args.serial)
+    try:
+        cam = BeamageCamera(dll_path=dll_path, serial_number=args.serial)
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        logger.error("Please specify --dll path or place SDK in expected location")
+        return 1
     
     try:
         # Connect
         if not cam.connect():
-            print("\n❌ Failed to connect!")
-            print("Check:")
-            print("  1. Camera is plugged in (USB3)")
-            print("  2. Drivers are installed")
-            print("  3. PC-BEAMAGE can see the camera")
-            print("  4. DLL_PATH is correct in this script")
-            exit(1)
-        
-        print("\n✓ Camera connected!")
+            return 1
         
         # Configure exposure
-        print("\n--- Configuring camera ---")
         if args.auto_exposure:
             cam.set_auto_exposure(True)
-            print("Auto exposure: ENABLED")
         elif args.exposure is not None:
             cam.set_exposure(args.exposure)
-            print(f"Manual exposure: {args.exposure} ms")
         else:
-            # Default to auto if neither specified
+            # Default to auto exposure if nothing specified
             cam.set_auto_exposure(True)
-            print("Auto exposure: ENABLED (default)")
         
-        # Configure gain
+        # Note: Gain not supported in this SDK version
         if args.gain is not None:
-            cam.set_gain(args.gain)
-            print(f"Gain: {args.gain}")
+            logger.warning("Gain setting not supported by this SDK version")
         
-        # Show current settings
-        current_exp = cam.get_exposure()
-        current_gain = cam.get_gain()
-        print(f"\nCurrent settings:")
-        print(f"  Exposure: {current_exp:.2f} ms")
-        if current_gain != -1:
-            print(f"  Gain: {current_gain}")
+        print(f"Current exposure: {cam.get_exposure():.2f} ms")
         
         # Start capture
-        print("\n--- Starting capture ---")
         cam.start()
-        time.sleep(1)  # Let it stabilize
+        time.sleep(1)  # Let camera stabilize
         
-        # Capture images
-        print(f"\n--- Capturing {args.frames} frames ---")
+        # Capture frames
+        print(f"\nCapturing {args.frames} frame(s)...\n")
+        
+        images = []
         for i in range(args.frames):
             img = cam.capture()
             stats = cam.get_beam_stats()
+            images.append(img)
             
-            print(f"\nFrame {i+1}/{args.frames}:")
-            print(f"  Image shape: {img.shape}")
-            print(f"  Min/Max: {img.min()} / {img.max()}")
-            print(f"  Beam 4σ: X={stats['diameter_x']:.2f} µm, "
-                  f"Y={stats['diameter_y']:.2f} µm")
-            print(f"  Centroid: ({stats['centroid_x']:.1f}, "
-                  f"{stats['centroid_y']:.1f})")
-            print(f"  FPS: {stats['fps']:.1f}")
+            print(f"Frame {i+1}/{args.frames}:")
+            print(f"  Shape: {img.shape}, Min/Max: {img.min()}/{img.max()}")
+            print(f"  Beam 4σ: X={stats['diameter_x']:.2f} µm, Y={stats['diameter_y']:.2f} µm")
+            print(f"  Centroid: ({stats['centroid_x']:.1f}, {stats['centroid_y']:.1f})")
+            if stats['fps'] > 0:
+                print(f"  FPS: {stats['fps']:.1f}")
+            print()
             
-            time.sleep(0.5)
+            if i < args.frames - 1:
+                time.sleep(args.delay)
         
-        # Save last image
-        print(f"\n--- Saving image ---")
-        np.save(args.output, img)
-        print(f"✓ Saved to {args.output}")
+        # Save output
+        output_path = Path(args.output)
+        ext = output_path.suffix.lower()
         
-        # Optional: plot with matplotlib
+        # Prepare data to save
+        if args.save_all:
+            save_data = np.stack(images, axis=0)
+            n_frames = len(images)
+        else:
+            save_data = images[-1]
+            n_frames = 1
+        
+        # Save based on file extension
+        if ext == '.fits':
+            save_fits(
+                output_path, 
+                save_data, 
+                stats=stats,
+                exposure_ms=cam.get_exposure(),
+                serial=args.serial or cam.sdk.cameras[cam.camera_index].Properties.GetSerialNumber(),
+                n_frames=n_frames
+            )
+        elif ext == '.npy':
+            np.save(output_path, save_data)
+            print(f"Saved to {output_path}")
+        else:
+            # Default to FITS if unknown extension
+            output_path = output_path.with_suffix('.fits')
+            save_fits(
+                output_path, 
+                save_data, 
+                stats=stats,
+                exposure_ms=cam.get_exposure(),
+                serial=args.serial or cam.sdk.cameras[cam.camera_index].Properties.GetSerialNumber(),
+                n_frames=n_frames
+            )
+        
+        # Plot unless disabled
         if not args.no_plot:
             try:
                 import matplotlib.pyplot as plt
-                plot_filename = args.output.replace('.npy', '.png')
-                plt.figure(figsize=(8, 8))
-                plt.imshow(img, cmap='hot', origin='lower')
-                plt.colorbar(label='Intensity')
-                plt.title(f"Beamage 4M IR - S/N:{cam.serial_number}\n"
-                         f"Exp: {current_exp:.2f}ms, Gain: {current_gain if current_gain != -1 else 'N/A'}")
-                plt.xlabel("X (pixels)")
-                plt.ylabel("Y (pixels)")
+                
+                img = images[-1]
+                
+                fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+                
+                # Full image
+                im0 = axes[0].imshow(img, cmap='hot', origin='lower')
+                axes[0].set_title(f"Full Sensor (2048×2048)")
+                axes[0].set_xlabel("X (pixels)")
+                axes[0].set_ylabel("Y (pixels)")
+                plt.colorbar(im0, ax=axes[0], label='Intensity')
+                
+                # Zoomed view around centroid
+                cx = int(stats['centroid_x'])
+                cy = int(stats['centroid_y'])
+                zoom = 50  # pixels around centroid
+                
+                x_min = max(0, cx - zoom)
+                x_max = min(img.shape[1], cx + zoom)
+                y_min = max(0, cy - zoom)
+                y_max = min(img.shape[0], cy + zoom)
+                
+                zoomed = img[y_min:y_max, x_min:x_max]
+                
+                im1 = axes[1].imshow(zoomed, cmap='hot', origin='lower',
+                                     extent=[x_min, x_max, y_min, y_max])
+                axes[1].set_title(f"Zoomed ({zoom*2}×{zoom*2} around centroid)")
+                axes[1].set_xlabel("X (pixels)")
+                axes[1].set_ylabel("Y (pixels)")
+                plt.colorbar(im1, ax=axes[1], label='Intensity')
+                
+                plt.suptitle(f"Beamage 4M IR - S/N:{args.serial or 'detected'}")
                 plt.tight_layout()
-                plt.savefig(plot_filename, dpi=150)
-                print(f"✓ Saved plot to {plot_filename}")
-                # plt.show()  # Uncomment to display
+                
+                # Save plot
+                plot_path = output_path.with_suffix('.png')
+                plt.savefig(plot_path, dpi=150)
+                print(f"Saved plot to {plot_path}")
+                
+                plt.show()
+                
             except ImportError:
-                print("(matplotlib not installed, skipping plot)")
+                logger.warning("matplotlib not installed, skipping plot")
         
+        print("\nDone!")
+        return 0
+        
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+        return 130
         
     except Exception as e:
-        print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
         
     finally:
         cam.disconnect()
-        print("\nCleaned up")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
