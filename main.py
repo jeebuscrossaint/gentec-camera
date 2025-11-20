@@ -26,6 +26,12 @@ SETUP INSTRUCTIONS:
 
 7. Run this script!
 
+USAGE:
+======
+python main.py --exposure=92.19 --gain=1
+python main.py --auto-exposure
+python main.py --exposure=100 --gain=2 --frames=10
+
 """
 
 import clr
@@ -35,6 +41,7 @@ from pathlib import Path
 from typing import Optional, Dict
 import logging
 import time
+import argparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -190,6 +197,34 @@ class BeamageCamera:
         
         return float(self.sdk.cameras[self.camera_index].Settings.exposureTime)
     
+    def set_gain(self, gain: int):
+        """
+        Set camera gain
+        
+        Args:
+            gain: Gain value (typically 1-4, check SDK docs for your model)
+        """
+        if not self.is_connected:
+            raise RuntimeError("Not connected!")
+        
+        try:
+            self.sdk.cameras[self.camera_index].SetGain(int(gain))
+            logger.info(f"Set gain: {gain}")
+        except Exception as e:
+            logger.error(f"Failed to set gain: {e}")
+            raise
+    
+    def get_gain(self) -> int:
+        """Get current gain value"""
+        if not self.is_connected:
+            raise RuntimeError("Not connected!")
+        
+        try:
+            return int(self.sdk.cameras[self.camera_index].Settings.gain)
+        except:
+            logger.warning("Could not read gain value")
+            return -1
+    
     def capture(self) -> np.ndarray:
         """
         Capture single image
@@ -273,17 +308,84 @@ class BeamageCamera:
         self.disconnect()
 
 
-# ============================================================================
-# EXAMPLE USAGE
-# ============================================================================
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description='Gentec Beamage 4M IR Camera Control',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python main.py --exposure=92.19 --gain=1
+  python main.py --auto-exposure --frames=10
+  python main.py --exposure=100 --gain=2 --frames=5 --output=my_capture.npy
+        """
+    )
+    
+    # Exposure settings
+    exposure_group = parser.add_mutually_exclusive_group()
+    exposure_group.add_argument(
+        '--exposure',
+        type=float,
+        metavar='MS',
+        help='Set manual exposure time in milliseconds (0.06-5000)'
+    )
+    exposure_group.add_argument(
+        '--auto-exposure',
+        action='store_true',
+        help='Enable auto exposure mode'
+    )
+    
+    # Gain setting
+    parser.add_argument(
+        '--gain',
+        type=int,
+        metavar='N',
+        help='Set camera gain (typically 1-4, check SDK docs)'
+    )
+    
+    # Capture settings
+    parser.add_argument(
+        '--frames',
+        type=int,
+        default=5,
+        metavar='N',
+        help='Number of frames to capture (default: 5)'
+    )
+    
+    parser.add_argument(
+        '--output',
+        type=str,
+        default='beamage_capture.npy',
+        metavar='FILE',
+        help='Output filename for saved image (default: beamage_capture.npy)'
+    )
+    
+    parser.add_argument(
+        '--no-plot',
+        action='store_true',
+        help='Skip matplotlib visualization'
+    )
+    
+    parser.add_argument(
+        '--serial',
+        type=str,
+        default='228451',
+        metavar='SN',
+        help='Camera serial number (default: 228451)'
+    )
+    
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
+    args = parse_arguments()
+    
     print("\n" + "="*70)
     print("Gentec Beamage 4M IR Camera - Python Interface")
     print("="*70 + "\n")
     
     # Create camera instance
-    cam = BeamageCamera(serial_number="228451")
+    cam = BeamageCamera(serial_number=args.serial)
     
     try:
         # Connect
@@ -298,23 +400,44 @@ if __name__ == "__main__":
         
         print("\n✓ Camera connected!")
         
-        # Configure
+        # Configure exposure
         print("\n--- Configuring camera ---")
-        cam.set_auto_exposure(True)  # or cam.set_exposure(100.0)
-        print(f"Current exposure: {cam.get_exposure():.2f} ms")
+        if args.auto_exposure:
+            cam.set_auto_exposure(True)
+            print("Auto exposure: ENABLED")
+        elif args.exposure is not None:
+            cam.set_exposure(args.exposure)
+            print(f"Manual exposure: {args.exposure} ms")
+        else:
+            # Default to auto if neither specified
+            cam.set_auto_exposure(True)
+            print("Auto exposure: ENABLED (default)")
+        
+        # Configure gain
+        if args.gain is not None:
+            cam.set_gain(args.gain)
+            print(f"Gain: {args.gain}")
+        
+        # Show current settings
+        current_exp = cam.get_exposure()
+        current_gain = cam.get_gain()
+        print(f"\nCurrent settings:")
+        print(f"  Exposure: {current_exp:.2f} ms")
+        if current_gain != -1:
+            print(f"  Gain: {current_gain}")
         
         # Start capture
         print("\n--- Starting capture ---")
         cam.start()
         time.sleep(1)  # Let it stabilize
         
-        # Capture some images
-        print("\n--- Capturing images ---")
-        for i in range(5):
+        # Capture images
+        print(f"\n--- Capturing {args.frames} frames ---")
+        for i in range(args.frames):
             img = cam.capture()
             stats = cam.get_beam_stats()
             
-            print(f"\nFrame {i+1}:")
+            print(f"\nFrame {i+1}/{args.frames}:")
             print(f"  Image shape: {img.shape}")
             print(f"  Min/Max: {img.min()} / {img.max()}")
             print(f"  Beam 4σ: X={stats['diameter_x']:.2f} µm, "
@@ -326,29 +449,29 @@ if __name__ == "__main__":
             time.sleep(0.5)
         
         # Save last image
-        print("\n--- Saving image ---")
-        np.save("beamage_capture.npy", img)
-        print("✓ Saved to beamage_capture.npy")
+        print(f"\n--- Saving image ---")
+        np.save(args.output, img)
+        print(f"✓ Saved to {args.output}")
         
         # Optional: plot with matplotlib
-        try:
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(8, 8))
-            plt.imshow(img, cmap='hot', origin='lower')
-            plt.colorbar(label='Intensity')
-            plt.title(f"Beamage 4M IR - S/N:{cam.serial_number}")
-            plt.xlabel("X (pixels)")
-            plt.ylabel("Y (pixels)")
-            plt.tight_layout()
-            plt.savefig("beamage_capture.png", dpi=150)
-            print("✓ Saved plot to beamage_capture.png")
-            # plt.show()  # Uncomment to display
-        except ImportError:
-            print("(matplotlib not installed, skipping plot)")
+        if not args.no_plot:
+            try:
+                import matplotlib.pyplot as plt
+                plot_filename = args.output.replace('.npy', '.png')
+                plt.figure(figsize=(8, 8))
+                plt.imshow(img, cmap='hot', origin='lower')
+                plt.colorbar(label='Intensity')
+                plt.title(f"Beamage 4M IR - S/N:{cam.serial_number}\n"
+                         f"Exp: {current_exp:.2f}ms, Gain: {current_gain if current_gain != -1 else 'N/A'}")
+                plt.xlabel("X (pixels)")
+                plt.ylabel("Y (pixels)")
+                plt.tight_layout()
+                plt.savefig(plot_filename, dpi=150)
+                print(f"✓ Saved plot to {plot_filename}")
+                # plt.show()  # Uncomment to display
+            except ImportError:
+                print("(matplotlib not installed, skipping plot)")
         
-        print("\n" + "="*70)
-        print("✓ Success! You're ready to integrate this into your code")
-        print("="*70 + "\n")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
