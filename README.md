@@ -24,3 +24,10 @@ The example at the bottom will capture 5 frames, print stats, save the data as .
 NOTE for some reason on my goofy laptop i gotta enter powershell then run cmd then run pwsh then run conda activate gentec-camera
 i love conda
 please numpy just update to python 3.14 already bro its been a month
+
+note please do run this twin
+unblock-File -Path ".\Example_Beamage_SDK_CSharp_V1.02.02\3. DLL File\BeamageSDK.dll"
+
+the above freaky powershell command simply lets windows run the code with teh dll since by the default windows doesnt let you just mess around with remotely downloaded dlls
+
+(can a man just use shared objects?)
