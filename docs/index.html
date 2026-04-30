@@ -8,176 +8,74 @@
 </head>
 <body>
 
-  <!-- HERO -->
-  <header class="hero">
-    <div class="hero-inner">
-      <div class="badge">Research Project · UCF CREOL Astrophotonics Lab</div>
-      <h1>Gentec Beamage<br /><span class="accent">Python Interface</span></h1>
-      <p class="sub">
-        A Python SDK wrapper for the Gentec Beamage 4M IR camera — enabling beam
-        profile capture, analysis, and export from a modern Python workflow.
-      </p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/jeebuscrossaint/gentec-camera" target="_blank">View on GitHub</a>
-        <a class="btn btn-ghost" href="#features">Explore Features</a>
-      </div>
-    </div>
-    <div class="hero-visual">
-      <div class="beam-ring r1"></div>
-      <div class="beam-ring r2"></div>
-      <div class="beam-ring r3"></div>
-      <div class="beam-core"></div>
-    </div>
+  <header>
+    <h1>Gentec Beamage Python Interface</h1>
+    <p class="sub">Python SDK wrapper for the Gentec Beamage 4M IR camera — UCF CREOL Astrophotonics Lab</p>
+    <a href="https://github.com/jeebuscrossaint/gentec-camera" target="_blank">View on GitHub →</a>
   </header>
 
-  <!-- WHAT IT IS -->
-  <section class="section">
-    <div class="container">
-      <h2 class="section-title">What is this?</h2>
-      <p class="section-body">
-        Controlling professional IR beam profiling hardware typically requires C# or C++ integration
-        through vendor SDKs. This project bridges that gap — wrapping the Gentec
-        <strong>BeamageSDK.dll</strong> via <strong>pythonnet</strong> to expose a clean, ergonomic
-        Python API. Researchers at the <strong>UCF CREOL Astrophotonics Lab</strong> can now capture
-        and analyze 2048×2048 IR beam profiles, extract beam statistics, and export publication-ready
-        data without leaving Python.
-      </p>
-      <div class="stat-row">
-        <div class="stat"><span class="stat-num">2048<sup>2</sup></span><span class="stat-label">Sensor Resolution</span></div>
-        <div class="stat"><span class="stat-num">1550 nm</span><span class="stat-label">Target Wavelength</span></div>
-        <div class="stat"><span class="stat-num">5.5 µm</span><span class="stat-label">Pixel Pitch</span></div>
-        <div class="stat"><span class="stat-num">FITS</span><span class="stat-label">Export Format</span></div>
-      </div>
-    </div>
-  </section>
+  <main>
 
-  <!-- FEATURES -->
-  <section class="section alt" id="features">
-    <div class="container">
-      <h2 class="section-title">Features</h2>
-      <div class="card-grid">
-
-        <div class="card">
-          <div class="card-icon">⚡</div>
-          <h3>Simple Python API</h3>
-          <p>
-            <code>connect()</code>, <code>capture()</code>, <code>get_beam_stats()</code> —
-            one-line calls over a full .NET SDK.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">📡</div>
-          <h3>Real-Time Beam Analysis</h3>
-          <p>
-            4-sigma beam diameters (X &amp; Y), centroid tracking, FPS, and
-            per-frame statistics streamed live from hardware.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🔭</div>
-          <h3>FITS Export</h3>
-          <p>
-            Full astronomical FITS headers: timestamp, exposure, beam stats,
-            wavelength range, instrument metadata — ready for publication.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🖼️</div>
-          <h3>Smart Visualization</h3>
-          <p>
-            Full-sensor view + auto-detected peak zoom with crosshair overlay.
-            Percentile-scaled hot colormap, saved to PNG automatically.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🧵</div>
-          <h3>Event-Driven Architecture</h3>
-          <p>
-            Asynchronous .NET event callbacks, thread-safe image buffering,
-            and timeout-protected capture for robust operation.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🖥️</div>
-          <h3>Full CLI</h3>
-          <p>
-            Argparse-powered interface with auto/manual exposure, multi-frame
-            capture, verbosity levels, and serial-number camera selection.
-          </p>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- USAGE -->
-  <section class="section">
-    <div class="container">
-      <h2 class="section-title">Usage</h2>
-      <div class="code-examples">
-        <div class="code-block">
-          <div class="code-label">Auto-exposure, 10 frames</div>
-          <pre><code>python main.py --auto-exposure --frames 10</code></pre>
-        </div>
-        <div class="code-block">
-          <div class="code-label">Manual exposure, custom output</div>
-          <pre><code>python main.py --exposure 50.5 --output capture.fits</code></pre>
-        </div>
-        <div class="code-block">
-          <div class="code-label">Target specific camera by serial</div>
-          <pre><code>python main.py --serial 228451 --auto-exposure</code></pre>
-        </div>
-        <div class="code-block">
-          <div class="code-label">Quiet mode, no visualization</div>
-          <pre><code>python main.py --exposure 100 --frames 5 --no-plot</code></pre>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- STACK -->
-  <section class="section alt">
-    <div class="container">
-      <h2 class="section-title">Tech Stack</h2>
-      <div class="stack-grid">
-        <div class="stack-item"><span class="stack-name">Python 3</span><span class="stack-role">Core language</span></div>
-        <div class="stack-item"><span class="stack-name">pythonnet</span><span class="stack-role">.NET / C# DLL bridge</span></div>
-        <div class="stack-item"><span class="stack-name">NumPy</span><span class="stack-role">Image array processing</span></div>
-        <div class="stack-item"><span class="stack-name">Matplotlib</span><span class="stack-role">Beam visualization</span></div>
-        <div class="stack-item"><span class="stack-name">Astropy</span><span class="stack-role">FITS file I/O</span></div>
-        <div class="stack-item"><span class="stack-name">BeamageSDK</span><span class="stack-role">Gentec hardware SDK</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONTEXT -->
-  <section class="section">
-    <div class="container narrow">
-      <h2 class="section-title">Context</h2>
-      <p class="section-body">
-        Built for the <strong>UCF CREOL Astrophotonics Lab</strong> under Dr. Eikenberry's research
-        group. CREOL (Center for Research and Education in Optics and Lasers) is one of the largest
-        optics research centers in the US. This tool fills a real gap in the lab's Python-first workflow
-        by making the Beamage-4M's vendor SDK accessible without dropping out of the research environment.
-      </p>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
+    <section>
+      <h2>Overview</h2>
       <p>
-        Built by <a href="https://github.com/jeebuscrossaint" target="_blank">jeebuscrossaint</a>
-        &nbsp;·&nbsp;
-        <a href="https://github.com/jeebuscrossaint/gentec-camera" target="_blank">GitHub</a>
-        &nbsp;·&nbsp; UCF CREOL Astrophotonics Lab
+        The Gentec Beamage 4M is a professional IR beam profiling camera that ships with a C# SDK.
+        This project wraps that SDK via <strong>pythonnet</strong> to expose a clean Python API,
+        letting researchers capture 2048×2048 IR beam profiles, extract beam statistics, and export
+        data without leaving their Python workflow.
       </p>
-    </div>
+      <p>
+        Built for Dr. Eikenberry's group at <strong>UCF CREOL</strong> (Center for Research and
+        Education in Optics and Lasers), one of the largest optics research centers in the US.
+      </p>
+    </section>
+
+    <section>
+      <h2>Features</h2>
+      <ul>
+        <li>Connect to and control Beamage-4M hardware over USB</li>
+        <li>Auto or manual exposure (0.06–5000 ms range)</li>
+        <li>4-sigma beam diameter (X &amp; Y), centroid position, and FPS — live from hardware</li>
+        <li>Export to FITS with full astronomical headers (timestamp, exposure, wavelength, beam stats)</li>
+        <li>PNG visualization with full-sensor view and auto-detected peak zoom</li>
+        <li>Thread-safe event-driven capture with configurable timeout</li>
+        <li>CLI with multi-frame capture, verbosity levels, and camera selection by serial number</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Usage</h2>
+      <pre><code># auto-exposure, capture 10 frames
+python main.py --auto-exposure --frames 10
+
+# manual exposure, custom output file
+python main.py --exposure 50.5 --output capture.fits
+
+# select camera by serial number
+python main.py --serial 228451 --auto-exposure
+
+# quiet mode, skip plot
+python main.py --exposure 100 --frames 5 --no-plot</code></pre>
+    </section>
+
+    <section>
+      <h2>Stack</h2>
+      <ul class="stack">
+        <li><strong>Python 3</strong> — core implementation</li>
+        <li><strong>pythonnet</strong> — bridges Python to the .NET BeamageSDK.dll</li>
+        <li><strong>NumPy</strong> — image array processing</li>
+        <li><strong>Matplotlib</strong> — beam visualization</li>
+        <li><strong>Astropy</strong> — FITS file I/O</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>
+      Built by <a href="https://github.com/jeebuscrossaint" target="_blank">jeebuscrossaint</a>
+      &nbsp;·&nbsp; UCF CREOL Astrophotonics Lab
+    </p>
   </footer>
 
 </body>
